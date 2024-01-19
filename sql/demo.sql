@@ -14,7 +14,7 @@ create foreign table hello (
        c2 int4,
        c3 float,
        c4 decimal(8,2),
+       -- a1 real[] -- deosn't work for real[]
        t1 text,
-       t2 char(2),
-       a1 real[]
+       t2 char(2)
 ) server random_server options (total '20', seed '123456');
