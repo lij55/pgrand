@@ -1,3 +1,5 @@
+-- noinspection SqlNoDataSourceInspectionForFile
+
 -- create extension
 create extension random_fdw;
 
@@ -8,7 +10,8 @@ create server random_server foreign data wrapper random_wrapper;
 
 -- create foreign table with options
 create foreign table hello (
-       c1 bigint,
-       c2 int,
-       c3 smallint
-) server random_server options (total '100');
+       c1 int2,
+       c2 int4,
+       c3 float,
+       c4 decimal(8,2)
+) server random_server options (total '20');
