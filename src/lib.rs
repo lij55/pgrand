@@ -1,50 +1,50 @@
 use pgrx::pg_sys::panic::ErrorReport;
 use pgrx::PgSqlErrorCode;
 use std::collections::HashMap;
+use rand::prelude::ThreadRng;
 use supabase_wrappers::prelude::*;
 
-// A simple demo FDW
+use rand::Rng;
+
+pgrx::pg_module_magic!();
+
+// A simple FDW that helps to generate random test data
 #[wrappers_fdw(
-version = "0.1.1",
-author = "Supabase",
-website = "https://github.com/supabase/wrappers/tree/main/wrappers/src/fdw/helloworld_fdw",
-error_type = "HelloWorldFdwError"
+author = "Jasper Li",
+website = "https://github.com/lij55/random_fdw.git",
+error_type = "RandomFdwError"
 )]
-pub(crate) struct HelloWorldFdw {
+pub(crate) struct RandomFdw {
     // row counter
     row_cnt: i64,
 
+    // total rows
+    total_rows: i64,
+
     // target column list
     tgt_cols: Vec<Column>,
+
+    // random generater
+    rng: ThreadRng
+
 }
 
-enum HelloWorldFdwError {}
+enum RandomFdwError {}
 
-impl From<HelloWorldFdwError> for ErrorReport {
-    fn from(_value: HelloWorldFdwError) -> Self {
+impl From<RandomFdwError> for ErrorReport {
+    fn from(_value: RandomFdwError) -> Self {
         ErrorReport::new(PgSqlErrorCode::ERRCODE_FDW_ERROR, "", "")
     }
 }
 
-type HelloWorldFdwResult<T> = Result<T, HelloWorldFdwError>;
+type RandomFdwResult<T> = Result<T, RandomFdwError>;
 
-impl ForeignDataWrapper<HelloWorldFdwError> for HelloWorldFdw {
-    // 'options' is the key-value pairs defined in `CREATE SERVER` SQL, for example,
-    //
-    // create server my_helloworld_server
-    //   foreign data wrapper wrappers_helloworld
-    //   options (
-    //     foo 'bar'
-    // );
-    //
-    // 'options' passed here will be a hashmap { 'foo' -> 'bar' }.
-    //
-    // You can do any initalization in this new() function, like saving connection
-    // info or API url in an variable, but don't do any heavy works like making a
-    // database connection or API call.
-    fn new(_options: &HashMap<String, String>) -> HelloWorldFdwResult<Self> {
+impl ForeignDataWrapper<RandomFdwError> for RandomFdw {
+    fn new(_options: &HashMap<String, String>) -> RandomFdwResult<Self> {
         Ok(Self {
             row_cnt: 0,
+            total_rows: 0,
+            rng :  ThreadRng::default(),
             tgt_cols: Vec::new(),
         })
     }
@@ -55,9 +55,14 @@ impl ForeignDataWrapper<HelloWorldFdwError> for HelloWorldFdw {
         columns: &[Column],
         _sorts: &[Sort],
         _limit: &Option<Limit>,
-        _options: &HashMap<String, String>,
-    ) -> HelloWorldFdwResult<()> {
-        // reset row counter
+        options: &HashMap<String, String>,
+    ) -> RandomFdwResult<()> {
+        // default is 1024
+        self.total_rows = match options.get(&"total".to_string()) {
+            Some(v)=> v.parse::<i64>().unwrap_or(1024),
+            None => 1024
+        };
+        rand::thread_rng();
         self.row_cnt = 0;
 
         // save a copy of target columns
@@ -66,16 +71,12 @@ impl ForeignDataWrapper<HelloWorldFdwError> for HelloWorldFdw {
         Ok(())
     }
 
-    fn iter_scan(&mut self, row: &mut Row) -> HelloWorldFdwResult<Option<()>> {
+    fn iter_scan(&mut self, row: &mut Row) -> RandomFdwResult<Option<()>> {
         // this is called on each row and we only return one row here
-        if self.row_cnt < 1 {
+        if self.row_cnt < self.total_rows {
             // add values to row if they are in target column list
             for tgt_col in &self.tgt_cols {
-                match tgt_col.name.as_str() {
-                    "id" => row.push("id", Some(Cell::I64(self.row_cnt))),
-                    "col" => row.push("col", Some(Cell::String("Hello world".to_string()))),
-                    _ => {}
-                }
+                row.push(tgt_col.name.as_str(), Some(Cell::I32(self.rng.gen())));
             }
 
             self.row_cnt += 1;
@@ -88,7 +89,7 @@ impl ForeignDataWrapper<HelloWorldFdwError> for HelloWorldFdw {
         Ok(None)
     }
 
-    fn end_scan(&mut self) -> HelloWorldFdwResult<()> {
+    fn end_scan(&mut self) -> RandomFdwResult<()> {
         // we do nothing here, but you can do things like resource cleanup and etc.
         Ok(())
     }
