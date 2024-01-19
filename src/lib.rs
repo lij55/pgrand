@@ -1,13 +1,17 @@
 use pgrx::pg_sys::panic::ErrorReport;
 use pgrx::{AnyNumeric, Date, JsonB, PgBuiltInOids, PgOid, PgSqlErrorCode, Timestamp};
 use std::collections::HashMap;
-use rand::prelude::ThreadRng;
+use rand_chacha::ChaCha8Rng;
+
 use supabase_wrappers::prelude::*;
 use std::iter::zip;
 use pgrx::pg_sys::Oid;
 
-
-use rand::Rng;
+use rand_chacha;
+use rand::{Rng, SeedableRng};
+use fake::{Dummy, Fake, Faker};
+use fake::decimal::Decimal;
+use rand::rngs::StdRng;
 
 pgrx::pg_module_magic!();
 
@@ -30,13 +34,13 @@ pub(crate) struct RandomFdw {
     fn_cols: Vec<Box<CellBuilder>>,
 
     // random generater
-    rng:  ThreadRng
+    rng:  ChaCha8Rng
 
 }
 
 //type  GenFun = fn (rng: &mut ThreadRng) -> Cell;
 // CellBuilder is the closure to generate value for a cell
-type CellBuilder = dyn Fn(&mut ThreadRng) -> Cell;
+type CellBuilder = dyn Fn(&mut ChaCha8Rng) -> Cell;
 
 enum RandomFdwError {}
 
@@ -53,7 +57,7 @@ impl ForeignDataWrapper<RandomFdwError> for RandomFdw {
         Ok(Self {
             row_cnt: 0,
             total_rows: 0,
-            rng :  ThreadRng::default(),
+            rng : ChaCha8Rng::from_entropy(),
             tgt_cols: Vec::new(),
             fn_cols: Vec::new(),
         })
@@ -72,16 +76,24 @@ impl ForeignDataWrapper<RandomFdwError> for RandomFdw {
             Some(v)=> v.parse::<u64>().unwrap_or(1024),
             None => 1024
         };
-        rand::thread_rng();
+
         self.row_cnt = 0;
 
         // save a copy of target columns
         self.tgt_cols = columns.to_vec();
 
         for c in columns {
-            self.fn_cols.push(create_numeric_closure(c.type_oid,100, 1000000))
+            self.fn_cols.push(create_closure(c.type_oid,options))
         }
+        let seed = match options.get(&"seed".to_string()) {
+            Some(v)=> v.parse::<u64>().unwrap_or(0),
+            None => 0
+        };
 
+        if seed > 0 {
+            self.rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+            //Faker.fake_with_rng(StdRng::from_seed(seed));
+        }
         Ok(())
     }
 
@@ -109,94 +121,72 @@ impl ForeignDataWrapper<RandomFdwError> for RandomFdw {
     }
 }
 
-fn create_numeric_closure(oid: Oid, min: i64, max: i64) -> Box<CellBuilder> {
+fn create_closure(oid: Oid, options: &HashMap<String, String>) -> Box<CellBuilder> {
+    let min = 10;
+    let max = 1000;
+    let max_len = 29;
     // Box::new(move |rng: &mut ThreadRng| -> Cell {
     //     Cell::I64(rng.gen_range(min..max))
     // })
     match PgOid::from(oid) {
         PgOid::BuiltIn(PgBuiltInOids::INT2OID) => {
-            Box::new(move |rng: &mut ThreadRng| -> Cell {
+            Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
                 Cell::I16(rng.gen_range(min as i16..max as i16))
             })
         }
         PgOid::BuiltIn(PgBuiltInOids::INT4OID) => {
-            Box::new(move |rng: &mut ThreadRng| -> Cell {
+            Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
                 Cell::I32(rng.gen_range(min as i32..max as i32))
             })
         }
         PgOid::BuiltIn(PgBuiltInOids::INT8OID) => {
-            Box::new(move |rng: &mut ThreadRng| -> Cell {
+            Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
                 Cell::I64(rng.gen_range(min..max))
             })
         }
         PgOid::BuiltIn(PgBuiltInOids::FLOAT4OID) => {
-            Box::new(move |rng: &mut ThreadRng| -> Cell {
+            Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
                 Cell::F32(rng.gen_range(0 as f32..10 as f32))
             })
         }
 
         PgOid::BuiltIn(PgBuiltInOids::FLOAT8OID) => {
-            Box::new(move |rng: &mut ThreadRng| -> Cell {
+            Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
                 Cell::F64(rng.gen_range(0 as f64..10 as f64))
             })
         }
         PgOid::BuiltIn(PgBuiltInOids::NUMERICOID) => {
-            Box::new(move |rng: &mut ThreadRng| -> Cell {
-                Cell::Numeric(AnyNumeric::try_from(rng.gen_range(100 as f32 ..1000 as f32)).unwrap_or_default())
+            Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
+                Cell::Numeric(AnyNumeric::try_from((100 as f32 ..1000 as f32).fake::<f32>()).unwrap_or_default())
             })
         }
 
-        _ => Box::new(move |rng: &mut ThreadRng| -> Cell {
-            Cell::I8(rng.gen_range(1..10))
+        PgOid::BuiltIn(PgBuiltInOids::CHAROID) => {
+            Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
+                Cell::I8(rng.gen())
+            })
+        }
+
+        PgOid::BuiltIn(PgBuiltInOids::TEXTOID) => {
+            Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
+                Cell::String((10..20).fake::<String>())
+            })
+        }
+        PgOid::BuiltIn(PgBuiltInOids::FLOAT4ARRAYOID) => {                                                                                                   
+           Box::new(move | rng: &mut ChaCha8Rng| -> Cell { 
+                Cell::String("".into())
+            })
+        }
+        _ => Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
+
+                Cell::String((10..20).fake::<String>())
+
         }),
     }
 }
 
-fn apply_builder<F>(f: F, rng: &mut ThreadRng) -> Cell where
-    F: Fn(&mut ThreadRng) -> Cell {
+
+fn apply_builder<F>(f: F, rng: &mut ChaCha8Rng) -> Cell where
+    F: Fn(&mut ChaCha8Rng) -> Cell {
     f(rng)
 }
-
-// fn get_closure(oid: Oid) -> Box<CellBuilder> {
-//     match oid {
-//         PgOid::BuiltIn(PgBuiltInOids::BOOLOID) => {
-//             Some(Cell::Bool(bool::from_datum(datum, false).unwrap()))
-//         }
-//         PgOid::BuiltIn(PgBuiltInOids::CHAROID) => {
-//             Some(Cell::I8(i8::from_datum(datum, false).unwrap()))
-//         }
-//         PgOid::BuiltIn(PgBuiltInOids::INT2OID) => {
-//             Box::new(move |rng: &mut ThreadRng| -> Cell {
-//                 Cell::I64(rng.gen_range(min..max))
-//             })
-//         }
-//         PgOid::BuiltIn(PgBuiltInOids::FLOAT4OID) => {
-//             Some(Cell::F32(f32::from_datum(datum, false).unwrap()))
-//         }
-//         PgOid::BuiltIn(PgBuiltInOids::INT4OID) => {
-//             Some(Cell::I32(i32::from_datum(datum, false).unwrap()))
-//         }
-//         PgOid::BuiltIn(PgBuiltInOids::FLOAT8OID) => {
-//             Some(Cell::F64(f64::from_datum(datum, false).unwrap()))
-//         }
-//         PgOid::BuiltIn(PgBuiltInOids::INT8OID) => {
-//             Some(Cell::I64(i64::from_datum(datum, false).unwrap()))
-//         }
-//         PgOid::BuiltIn(PgBuiltInOids::NUMERICOID) => {
-//             Some(Cell::Numeric(AnyNumeric::from_datum(datum, false).unwrap()))
-//         }
-//         PgOid::BuiltIn(PgBuiltInOids::TEXTOID) => {
-//             Some(Cell::String(String::from_datum(datum, false).unwrap()))
-//         }
-//         PgOid::BuiltIn(PgBuiltInOids::DATEOID) => {
-//             Some(Cell::Date(Date::from_datum(datum, false).unwrap()))
-//         }
-//         PgOid::BuiltIn(PgBuiltInOids::TIMESTAMPOID) => Some(Cell::Timestamp(
-//             Timestamp::from_datum(datum, false).unwrap(),
-//         )),
-//         PgOid::BuiltIn(PgBuiltInOids::JSONBOID) => {
-//             Some(Cell::Json(JsonB::from_datum(datum, false).unwrap()))
-//         }
-//         _ => None,
-//     }
-// }

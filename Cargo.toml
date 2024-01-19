@@ -15,8 +15,9 @@ pg_test = []
 [dependencies]
 pgrx = "=0.11.0"
 supabase-wrappers = { git = "https://github.com/supabase/wrappers.git", tag = "v0.2.0"}
-rand = "0.8.5"
-
+rand_chacha = "0.3.1"
+fake = { version = "2.9.2", features = ["rust_decimal"] }
+rand = { version = "0.8.5", features = [] }
 
 [dev-dependencies]
 pgrx-tests = "=0.11.0"

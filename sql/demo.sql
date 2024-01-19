@@ -13,5 +13,8 @@ create foreign table hello (
        c1 int2,
        c2 int4,
        c3 float,
-       c4 decimal(8,2)
-) server random_server options (total '20');
+       c4 decimal(8,2),
+       t1 text,
+       t2 char(2),
+       a1 real[]
+) server random_server options (total '20', seed '123456');
