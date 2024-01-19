@@ -1,0 +1,30 @@
+[package]
+name = "random_fdw"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+default = ["pg15"]
+pg15 = ["pgrx/pg15", "pgrx-tests/pg15" ]
+pg16 = ["pgrx/pg16", "pgrx-tests/pg16" ]
+pg_test = []
+
+[dependencies]
+pgrx = "=0.11.0"
+supabase-wrappers = { git = "https://github.com/supabase/wrappers.git", tag = "v0.2.0"}
+
+
+[dev-dependencies]
+pgrx-tests = "=0.11.0"
+
+[profile.dev]
+panic = "unwind"
+
+[profile.release]
+panic = "unwind"
+opt-level = 3
+lto = "fat"
+codegen-units = 1
