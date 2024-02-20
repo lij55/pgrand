@@ -1,7 +1,7 @@
 -- noinspection SqlNoDataSourceInspectionForFile
 
 -- create extension
-create extension random_fdw;
+create extension pgrand;
 
 -- create foreign data wrapper and foreign server'
 create foreign data wrapper random_wrapper handler random_fdw_handler;
@@ -18,3 +18,5 @@ create foreign table hello (
        t1 text,
        t2 char(2)
 ) server random_server options (total '20', seed '123456');
+
+create table t1 (c1 int, c2 int, c3 int);

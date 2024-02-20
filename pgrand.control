@@ -1,0 +1,5 @@
+comment = 'pgrand:  generate random table data, powered by pgrx'
+default_version = '@CARGO_VERSION@'
+module_pathname = '$libdir/pgrand'
+relocatable = false
+superuser = true

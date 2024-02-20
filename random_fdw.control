@@ -1,5 +1,0 @@
-comment = 'random_fdw:  generate random table data, powered by pgrx and supa_wrapper'
-default_version = '@CARGO_VERSION@'
-module_pathname = '$libdir/random_fdw'
-relocatable = false
-superuser = true

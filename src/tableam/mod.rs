@@ -1,5 +1,7 @@
+use fake::Fake;
 use pgrx::pg_sys::*;
 use pgrx::*;
+use rand_chacha::ChaCha8Rng;
 use std::ptr::addr_of_mut;
 
 /*
@@ -27,6 +29,7 @@ pub extern "C" fn random_scan_begin(
     pscan: ParallelTableScanDesc,
     flags: uint32,
 ) -> TableScanDesc {
+    eprintln!("in scan_begin");
     let desc = Box::leak(Box::new(TableScanDescData {
         rs_rd: rel,
         rs_snapshot: snapshot,
@@ -75,17 +78,32 @@ pub extern "C" fn random_scan_getnextslot(
     _direction: ScanDirection,
     slot: *mut TupleTableSlot,
 ) -> bool {
-    unsafe { deltalake_scan_getnextslot_impl(scan, slot) }
+    unsafe { random_scan_getnextslot_impl(scan, slot) }
 }
 
-unsafe fn deltalake_scan_getnextslot_impl(
+unsafe fn random_scan_getnextslot_impl(
     scan: pg_sys::TableScanDesc,
     slot: *mut pg_sys::TupleTableSlot,
 ) -> bool {
+    eprintln!("in scan_getnextslot");
     if let Some(clear) = (*slot).tts_ops.as_ref().unwrap().clear {
         clear(slot);
     }
-    false
+
+    let tup_desc = (*slot).tts_tupleDescriptor;
+
+    let tuple_desc = PgTupleDesc::from_pg_unchecked(tup_desc);
+
+    for (col_index, attr) in tuple_desc.iter().enumerate() {
+        eprintln!("{col_index}: {}", attr.atttypid);
+        let tts_isnull = (*slot).tts_isnull.add(col_index);
+        let tts_value = (*slot).tts_values.add(col_index);
+
+        *tts_value = Datum::from((1..200).fake::<u8>());
+        *tts_isnull = false;
+    }
+    pg_sys::ExecStoreVirtualTuple(slot);
+    true
 }
 
 pub extern "C" fn random_parallelscan_estimate(rel: Relation) -> Size {
@@ -462,7 +480,7 @@ pub extern "C" fn random_slot_callbacks(
     unsafe { &pg_sys::TTSOpsVirtual }
 }
 
-pub static mut DELTALAKE_TABLE_AM_ROUTINE: pg_sys::TableAmRoutine = pg_sys::TableAmRoutine {
+pub static mut RANDOM_TABLE_AM_ROUTINE: pg_sys::TableAmRoutine = pg_sys::TableAmRoutine {
     type_: pg_sys::NodeTag::T_TableAmRoutine,
     slot_callbacks: Some(random_slot_callbacks),
     scan_begin: Some(random_scan_begin),
@@ -519,24 +537,24 @@ pub static mut DELTALAKE_TABLE_AM_ROUTINE: pg_sys::TableAmRoutine = pg_sys::Tabl
 
 #[pg_guard]
 #[no_mangle]
-extern "C" fn pg_finfo_deltalake_tableam_handler() -> &'static pg_sys::Pg_finfo_record {
+extern "C" fn pg_finfo_random_tableam_handler() -> &'static pg_sys::Pg_finfo_record {
     const V1_API: pg_sys::Pg_finfo_record = pg_sys::Pg_finfo_record { api_version: 1 };
     &V1_API
 }
 
 extension_sql!(
     r#"
-    CREATE FUNCTION deltalake_tableam_handler(internal)
-    RETURNS table_am_handler AS 'MODULE_PATHNAME', 'deltalake_tableam_handler' LANGUAGE C STRICT;
-    CREATE ACCESS METHOD parquet TYPE TABLE HANDLER deltalake_tableam_handler;
-    COMMENT ON ACCESS METHOD parquet IS 'ParadeDB parquet table access method';
+    CREATE FUNCTION random_tableam_handler(internal)
+    RETURNS table_am_handler AS 'MODULE_PATHNAME', 'random_tableam_handler' LANGUAGE C STRICT;
+    CREATE ACCESS METHOD random TYPE TABLE HANDLER random_tableam_handler;
+    COMMENT ON ACCESS METHOD random IS 'generate random data';
     "#,
-    name = "deltalake_tableam_handler"
+    name = "random_tableam_handler"
 );
 #[no_mangle]
 #[pg_guard]
-extern "C" fn deltalake_tableam_handler(
+extern "C" fn random_tableam_handler(
     _fcinfo: pg_sys::FunctionCallInfo,
 ) -> *mut pg_sys::TableAmRoutine {
-    unsafe { addr_of_mut!(DELTALAKE_TABLE_AM_ROUTINE) }
+    unsafe { addr_of_mut!(RANDOM_TABLE_AM_ROUTINE) }
 }
