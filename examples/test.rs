@@ -9,7 +9,7 @@ fn my_hash<T>(obj: T) -> u128
 {
     let mut hasher = DefaultHasher::new();
     obj.hash(&mut hasher);
-    hasher.finish()
+    hasher.finish() as u128
 }
 
 fn main() {
