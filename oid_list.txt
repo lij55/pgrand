@@ -1,0 +1,41 @@
+pub const BOOLOID: Oid = Oid(16);
+pub const BYTEAOID: Oid = Oid(17);
+pub const CHAROID: Oid = Oid(18);
+pub const NAMEOID: Oid = Oid(19);
+pub const INT8OID: Oid = Oid(20);
+pub const INT2OID: Oid = Oid(21);
+pub const INT4OID: Oid = Oid(23);
+pub const TEXTOID: Oid = Oid(25);
+pub const FLOAT4OID: Oid = Oid(700);
+pub const FLOAT8OID: Oid = Oid(701);
+pub const VARCHAROID: Oid = Oid(1043);
+pub const DATEOID: Oid = Oid(1082);
+pub const TIMEOID: Oid = Oid(1083);
+pub const TIMESTAMPOID: Oid = Oid(1114);
+pub const TIMESTAMPTZOID: Oid = Oid(1184);
+pub const INTERVALOID: Oid = Oid(1186);
+pub const TIMETZOID: Oid = Oid(1266);
+pub const NUMERICOID: Oid = Oid(1700);
+
+
+pub const JSONOID: Oid = Oid(114);
+pub const XMLOID: Oid = Oid(142);
+pub const POINTOID: Oid = Oid(600);
+pub const LSEGOID: Oid = Oid(601);
+pub const PATHOID: Oid = Oid(602);
+pub const BOXOID: Oid = Oid(603);
+pub const POLYGONOID: Oid = Oid(604);
+pub const LINEOID: Oid = Oid(628);
+
+pub const CIRCLEOID: Oid = Oid(718);
+pub const MONEYOID: Oid = Oid(790);
+pub const MACADDROID: Oid = Oid(829);
+pub const INETOID: Oid = Oid(869);
+pub const CIDROID: Oid = Oid(650);
+pub const MACADDR8OID: Oid = Oid(774);
+pub const ACLITEMOID: Oid = Oid(1033);
+pub const BPCHAROID: Oid = Oid(1042);
+
+pub const BITOID: Oid = Oid(1560);
+pub const VARBITOID: Oid = Oid(1562);
+pub const UUIDOID: Oid = Oid(2950);
