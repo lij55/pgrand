@@ -13,7 +13,6 @@ pub const DATEOID: Oid = Oid(1082);
 pub const TIMEOID: Oid = Oid(1083);
 pub const TIMESTAMPOID: Oid = Oid(1114);
 pub const TIMESTAMPTZOID: Oid = Oid(1184);
-pub const INTERVALOID: Oid = Oid(1186);
 pub const TIMETZOID: Oid = Oid(1266);
 pub const NUMERICOID: Oid = Oid(1700);
 

@@ -63,23 +63,10 @@ pub extern "C" fn random_scan_begin(
     }))
 }
 
-fn Datum_from_oid(typid: Oid, rng: &mut ChaCha8Rng) -> Option<Datum> {
-    // match typid {
-    //     BOOLOID => Some(false.into()),
-    //     CHAROID => Some(3.into()),
-    //     INT2OID => Some(10.into()),
-    //     INT4OID => Some(20.into()),
-    //     INT8OID => Some(30.into()),
-    //     FLOAT4OID => Some(10.01_f32.to_bits().into()),
-    //     FLOAT8OID => Some(100.001_f64.to_bits().into()),
-    //     FLOAT4ARRAYOID => vec![1.23_f32, 2.048_f32].into_datum(),
-    //     FLOAT8ARRAYOID => vec![1.024_f32, 2.048_f32].into_datum(),
-    //     NUMERICOID => AnyNumeric::try_from(42.42).into_datum(),
-    //     _ => None,
-    // }
-    let gen = create_closure(typid);
-    apply_builder(gen, rng)
-}
+// fn Datum_from_oid(typid: Oid, rng: &mut ChaCha8Rng) -> Option<Datum> {
+//     let gen = create_closure(typid);
+//     apply_builder(gen, rng)
+// }
 
 #[pg_guard]
 pub extern "C" fn random_scan_getnextslot(
@@ -110,7 +97,7 @@ unsafe fn random_scan_getnextslot_impl(
         let tts_isnull = (*slot).tts_isnull.add(col_index);
         let tts_value = (*slot).tts_values.add(col_index);
 
-        match Datum_from_oid(attr.atttypid, &mut rng) {
+        match generate_random_data_for_oid(attr.atttypid, &mut rng) {
             Some(v) => *tts_value = v,
             None => *tts_isnull = true,
         }
