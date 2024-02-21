@@ -42,7 +42,7 @@ pub extern "C" fn random_scan_begin(
     pscan: ParallelTableScanDesc,
     flags: uint32,
 ) -> TableScanDesc {
-    eprintln!("in scan_begin");
+    //eprintln!("in scan_begin");
 
     Box::leak(Box::new(TableScanDescData {
         rs_rd: rel,
@@ -80,7 +80,7 @@ unsafe fn random_scan_getnextslot_impl(
     _scan: pg_sys::TableScanDesc,
     slot: *mut pg_sys::TupleTableSlot,
 ) -> bool {
-    eprintln!("in scan_getnextslot");
+    //eprintln!("in scan_getnextslot");
     if let Some(clear) = (*slot).tts_ops.as_ref().unwrap().clear {
         clear(slot);
     }
@@ -169,11 +169,11 @@ extern "C" fn pg_finfo_random_tableam_handler() -> &'static pg_sys::Pg_finfo_rec
 
 extension_sql!(
     r#"
-    CREATE FUNCTION random_tableam_handler(internal)
-    RETURNS table_am_handler AS 'MODULE_PATHNAME', 'random_tableam_handler' LANGUAGE C STRICT;
-    CREATE ACCESS METHOD random TYPE TABLE HANDLER random_tableam_handler;
-    COMMENT ON ACCESS METHOD random IS 'generate random data';
-    "#,
+CREATE FUNCTION random_tableam_handler(internal)
+RETURNS table_am_handler AS 'MODULE_PATHNAME', 'random_tableam_handler' LANGUAGE C STRICT;
+CREATE ACCESS METHOD random TYPE TABLE HANDLER random_tableam_handler;
+COMMENT ON ACCESS METHOD random IS 'generate random data';
+"#,
     name = "random_tableam_handler"
 );
 #[no_mangle]

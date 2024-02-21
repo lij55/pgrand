@@ -4,7 +4,7 @@
 create extension pgrand;
 
 -- create foreign data wrapper and foreign server'
-create foreign data wrapper random_wrapper handler random_fdw_handler;
+create foreign data wrapper random handler random_fdw_handler;
 
 create server random_server foreign data wrapper random_wrapper;
 
