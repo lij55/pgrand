@@ -1,13 +1,12 @@
+#![allow(dead_code)]
 mod functions;
 
-use lazy_static::lazy_static;
 use pgrx::pg_sys::*;
 use pgrx::*;
 use std::ptr::addr_of_mut;
-use std::sync::Arc;
 
 use crate::utils::*;
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use rand_chacha;
 use rand_chacha::ChaCha8Rng;
 
@@ -78,7 +77,7 @@ pub extern "C" fn random_scan_getnextslot(
 }
 
 unsafe fn random_scan_getnextslot_impl(
-    scan: pg_sys::TableScanDesc,
+    _scan: pg_sys::TableScanDesc,
     slot: *mut pg_sys::TupleTableSlot,
 ) -> bool {
     eprintln!("in scan_getnextslot");

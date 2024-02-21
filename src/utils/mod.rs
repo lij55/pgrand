@@ -1,10 +1,9 @@
-use fake::{Dummy, Fake, Faker};
+#![allow(dead_code)]
+use fake::Fake;
 use pgrx::pg_sys::*;
-use pgrx::{
-    AnyNumeric, Date, IntoDatum, PgBuiltInOids, PgOid, Time, Timestamp, TimestampWithTimeZone,
-};
-use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use pgrx::{AnyNumeric, Date, IntoDatum, Time};
+
+use rand::Rng;
 use rand_chacha;
 use rand_chacha::ChaCha8Rng;
 
@@ -13,7 +12,7 @@ pub type DataBuilder = dyn Fn(&mut ChaCha8Rng) -> Option<Datum>;
 pub fn create_closure(oid: Oid) -> Box<DataBuilder> {
     let min = 10;
     let max = 1000;
-    let max_len = 29;
+    let _max_len = 29;
     // Box::new(move |rng: &mut ThreadRng| -> Cell {
     //     Cell::I64(rng.gen_range(min..max))
     // })
@@ -28,7 +27,7 @@ pub fn create_closure(oid: Oid) -> Box<DataBuilder> {
             }
             values.into_datum()
         }),
-        _ => Box::new(move |rng: &mut ChaCha8Rng| -> Option<Datum> { None }),
+        _ => Box::new(move |_rng: &mut ChaCha8Rng| -> Option<Datum> { None }),
     }
 }
 

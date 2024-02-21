@@ -11,12 +11,12 @@ pub extern "C" fn random_scan_end(_scan: TableScanDesc) {
 
 #[pg_guard]
 pub extern "C" fn random_rescan(
-    scan: TableScanDesc,
-    key: *mut ScanKeyData,
-    set_params: bool,
-    allow_strat: bool,
-    allow_sync: bool,
-    allow_pagemode: bool,
+    _scan: TableScanDesc,
+    _key: *mut ScanKeyData,
+    _set_params: bool,
+    _allow_strat: bool,
+    _allow_sync: bool,
+    _allow_pagemode: bool,
 ) {
     /*
      * Restart relation scan.  If set_params is set to true, allow_{strat,
@@ -127,9 +127,9 @@ pub extern "C" fn random_tuple_insert(
 
 #[pg_guard]
 pub extern "C" fn random_multi_insert(
-    rel: pg_sys::Relation,
-    slots: *mut *mut pg_sys::TupleTableSlot,
-    nslots: ::std::os::raw::c_int,
+    _rel: pg_sys::Relation,
+    _slots: *mut *mut pg_sys::TupleTableSlot,
+    _nslots: ::std::os::raw::c_int,
     _cid: pg_sys::CommandId,
     _options: ::std::os::raw::c_int,
     _bistate: *mut pg_sys::BulkInsertStateData,
@@ -138,7 +138,7 @@ pub extern "C" fn random_multi_insert(
 
 #[pg_guard]
 pub extern "C" fn random_finish_bulk_insert(
-    rel: pg_sys::Relation,
+    _rel: pg_sys::Relation,
     _options: ::std::os::raw::c_int,
 ) {
 }
@@ -150,7 +150,7 @@ pub extern "C" fn random_tuple_insert_speculative(
     _cid: pg_sys::CommandId,
     _options: ::std::os::raw::c_int,
     _bistate: *mut pg_sys::BulkInsertStateData,
-    _specToken: pg_sys::uint32,
+    _spec_token: pg_sys::uint32,
 ) {
 }
 
@@ -158,7 +158,7 @@ pub extern "C" fn random_tuple_insert_speculative(
 pub extern "C" fn random_tuple_complete_speculative(
     _rel: pg_sys::Relation,
     _slot: *mut pg_sys::TupleTableSlot,
-    _specToken: pg_sys::uint32,
+    _spec_token: pg_sys::uint32,
     _succeeded: bool,
 ) {
 }
@@ -187,7 +187,7 @@ pub extern "C" fn random_tuple_delete(
     _crosscheck: pg_sys::Snapshot,
     _wait: bool,
     _tmfd: *mut pg_sys::TM_FailureData,
-    _changingPart: bool,
+    _changing_part: bool,
 ) -> pg_sys::TM_Result {
     0
 }
@@ -219,11 +219,11 @@ pub extern "C" fn random_relation_copy_data(
 
 #[pg_guard]
 pub extern "C" fn random_relation_copy_for_cluster(
-    _NewTable: pg_sys::Relation,
-    _OldTable: pg_sys::Relation,
-    _OldIndex: pg_sys::Relation,
+    _new_table: pg_sys::Relation,
+    _old_table: pg_sys::Relation,
+    _old_index: pg_sys::Relation,
     _use_sort: bool,
-    _OldestXmin: pg_sys::TransactionId,
+    _oldest_xmin: pg_sys::TransactionId,
     _xid_cutoff: *mut pg_sys::TransactionId,
     _multi_cutoff: *mut pg_sys::MultiXactId,
     _num_tuples: *mut f64,
@@ -252,7 +252,7 @@ pub extern "C" fn random_scan_analyze_next_block(
 #[pg_guard]
 pub extern "C" fn random_scan_analyze_next_tuple(
     _scan: pg_sys::TableScanDesc,
-    _OldestXmin: pg_sys::TransactionId,
+    _oldest_xmin: pg_sys::TransactionId,
     _liverows: *mut f64,
     _deadrows: *mut f64,
     _slot: *mut pg_sys::TupleTableSlot,
@@ -307,7 +307,7 @@ pub extern "C" fn random_index_validate_scan(
 #[pg_guard]
 pub extern "C" fn random_relation_size(
     _rel: pg_sys::Relation,
-    _forkNumber: pg_sys::ForkNumber,
+    _fork_number: pg_sys::ForkNumber,
 ) -> pg_sys::uint64 {
     0
 }
@@ -346,10 +346,10 @@ pub extern "C" fn random_scan_sample_next_tuple(
 
 #[pg_guard]
 pub extern "C" fn deltalake_relation_set_new_filenode(
-    rel: pg_sys::Relation,
+    _rel: pg_sys::Relation,
     _newrnode: *const pg_sys::RelFileNode,
-    persistence: ::std::os::raw::c_char,
-    _freezeXid: *mut pg_sys::TransactionId,
+    _persistence: ::std::os::raw::c_char,
+    _freeze_xid: *mut pg_sys::TransactionId,
     _minmulti: *mut pg_sys::MultiXactId,
 ) {
 }

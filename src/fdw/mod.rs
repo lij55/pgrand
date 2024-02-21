@@ -1,5 +1,5 @@
 use pgrx::pg_sys::panic::ErrorReport;
-use pgrx::{AnyNumeric, Date, JsonB, PgBuiltInOids, PgOid, PgSqlErrorCode, Timestamp};
+use pgrx::{AnyNumeric, PgBuiltInOids, PgOid, PgSqlErrorCode};
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashMap;
 
@@ -7,8 +7,8 @@ use pgrx::pg_sys::Oid;
 use std::iter::zip;
 use supabase_wrappers::prelude::*;
 
-use fake::{Dummy, Fake, Faker};
-use rand::rngs::StdRng;
+use fake::{Fake};
+
 use rand::{Rng, SeedableRng};
 use rand_chacha;
 
@@ -117,10 +117,10 @@ impl ForeignDataWrapper<RandomFdwError> for RandomFdw {
     }
 }
 
-fn create_closure(oid: Oid, options: &HashMap<String, String>) -> Box<CellBuilder> {
+fn create_closure(oid: Oid, _options: &HashMap<String, String>) -> Box<CellBuilder> {
     let min = 10;
     let max = 1000;
-    let max_len = 29;
+    let _max_len = 29;
     // Box::new(move |rng: &mut ThreadRng| -> Cell {
     //     Cell::I64(rng.gen_range(min..max))
     // })
@@ -159,7 +159,7 @@ fn create_closure(oid: Oid, options: &HashMap<String, String>) -> Box<CellBuilde
         PgOid::BuiltIn(PgBuiltInOids::TEXTOID) => Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
             Cell::String((10..20).fake_with_rng::<String, ChaCha8Rng>(rng))
         }),
-        _ => Box::new(move |rng: &mut ChaCha8Rng| -> Cell { Cell::String(String::from("")) }),
+        _ => Box::new(move |_rng: &mut ChaCha8Rng| -> Cell { Cell::String(String::from("")) }),
     }
 }
 
