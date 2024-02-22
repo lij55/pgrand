@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 use core::ffi::c_char;
 use pgrx::pg_sys::*;
 use pgrx::*;

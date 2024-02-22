@@ -21,9 +21,9 @@ impl RandomGUC {
         Self {
             min_integer: GucSetting::<i32>::new(-10000),
             max_integer: GucSetting::<i32>::new(10000),
-            min_text_length: GucSetting::<i32>::new(5),
-            max_text_length: GucSetting::<i32>::new(128),
-            array_length: GucSetting::<i32>::new(16),
+            min_text_length: GucSetting::<i32>::new(30000),
+            max_text_length: GucSetting::<i32>::new(50000),
+            array_length: GucSetting::<i32>::new(1024),
             float_scale: GucSetting::<i32>::new(1),
         }
     }

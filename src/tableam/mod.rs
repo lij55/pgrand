@@ -17,22 +17,6 @@ struct RandomScanDesc {
     pub rng: ChaCha8Rng,
 }
 
-/*
- * Start a scan of `rel`.  The callback has to return a TableScanDesc,
- * which will typically be embedded in a larger, AM specific, struct.
- *
- * If nkeys != 0, the results need to be filtered by those scan keys.
- *
- * pscan, if not NULL, will have already been initialized with
- * parallelscan_initialize(), and has to be for the same relation. Will
- * only be set coming from table_beginscan_parallel().
- *
- * `flags` is a bitmask indicating the type of scan (ScanOptions's
- * SO_TYPE_*, currently only one may be specified), options controlling
- * the scan's behaviour (ScanOptions's SO_ALLOW_*, several may be
- * specified, an AM may ignore unsupported ones) and whether the snapshot
- * needs to be deallocated at scan_end (ScanOptions's SO_TEMP_SNAPSHOT).
- */
 #[pg_guard]
 pub extern "C" fn random_scan_begin(
     rel: Relation,
@@ -62,50 +46,39 @@ pub extern "C" fn random_scan_begin(
     }))
 }
 
-// fn Datum_from_oid(typid: Oid, rng: &mut ChaCha8Rng) -> Option<Datum> {
-//     let gen = create_closure(typid);
-//     apply_builder(gen, rng)
-// }
-
 #[pg_guard]
 pub extern "C" fn random_scan_getnextslot(
-    scan: TableScanDesc,
+    _scan: TableScanDesc,
     _direction: ScanDirection,
     slot: *mut TupleTableSlot,
 ) -> bool {
-    unsafe { random_scan_getnextslot_impl(scan, slot) }
-}
+    unsafe {
+        let mut rng = ChaCha8Rng::from_entropy();
 
-unsafe fn random_scan_getnextslot_impl(
-    _scan: pg_sys::TableScanDesc,
-    slot: *mut pg_sys::TupleTableSlot,
-) -> bool {
-    //log!("in scan_getnextslot {:#?}", slot);
-    let mut rng = ChaCha8Rng::from_entropy();
+        let tup_desc = (*slot).tts_tupleDescriptor;
 
-    let tup_desc = (*slot).tts_tupleDescriptor;
+        let tuple_desc = PgTupleDesc::from_pg_copy(tup_desc);
 
-    let tuple_desc = PgTupleDesc::from_pg_copy(tup_desc);
-
-    if let Some(clear) = (*slot).tts_ops.as_ref().unwrap().clear {
-        clear(slot);
-    }
-
-    for (col_index, attr) in tuple_desc.iter().enumerate() {
-        //eprintln!("{col_index}: {}", attr.atttypid);
-        let tts_isnull = (*slot).tts_isnull.add(col_index);
-        let tts_value = (*slot).tts_values.add(col_index);
-
-        match generate_random_data_for_oid(attr.atttypid, &mut rng) {
-            Some(v) => *tts_value = v,
-            None => *tts_isnull = true,
+        if let Some(clear) = (*slot).tts_ops.as_ref().unwrap().clear {
+            clear(slot);
         }
-        // *tts_isnull = true;
+
+        for (col_index, attr) in tuple_desc.iter().enumerate() {
+            //eprintln!("{col_index}: {}", attr.atttypid);
+            let tts_isnull = (*slot).tts_isnull.add(col_index);
+            let tts_value = (*slot).tts_values.add(col_index);
+
+            match generate_random_data_for_oid(attr.atttypid, &mut rng) {
+                Some(v) => *tts_value = v,
+                None => *tts_isnull = true,
+            }
+            // *tts_isnull = true;
+        }
+
+        pg_sys::ExecStoreVirtualTuple(slot);
+
+        true
     }
-
-    pg_sys::ExecStoreVirtualTuple(slot);
-
-    true
 }
 
 pub static mut RANDOM_TABLE_AM_ROUTINE: pg_sys::TableAmRoutine = pg_sys::TableAmRoutine {
