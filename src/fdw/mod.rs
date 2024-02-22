@@ -1,171 +1,194 @@
-use pgrx::pg_sys::panic::ErrorReport;
-use pgrx::{AnyNumeric, PgBuiltInOids, PgOid, PgSqlErrorCode};
+use crate::utils::generate_random_data_for_oid;
+use pgrx::pg_sys::*;
+use pgrx::{extension_sql, pg_guard, pg_sys, PgTupleDesc};
+use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha8Rng;
-use std::collections::HashMap;
+use std::os::raw::c_int;
+use std::ptr;
+use std::ptr::addr_of_mut;
 
-use pgrx::pg_sys::Oid;
-use std::iter::zip;
-use supabase_wrappers::prelude::*;
-
-use fake::{Fake};
-
-use rand::{Rng, SeedableRng};
-use rand_chacha;
-
-// A simple FDW that helps to generate random test data
-#[wrappers_fdw(
-    author = "Jasper Li",
-    website = "https://github.com/lij55/random_fdw.git",
-    error_type = "RandomFdwError"
-)]
-pub(crate) struct RandomFdw {
-    // row counter
-    row_cnt: u64,
-
-    // total rows
-    total_rows: u64,
-
-    // target column list
-    tgt_cols: Vec<Column>,
-
-    fn_cols: Vec<Box<CellBuilder>>,
-
-    // random generater
-    rng: ChaCha8Rng,
+#[pg_guard]
+pub extern "C" fn random_get_foreign_rel_size(
+    _root: *mut PlannerInfo,
+    _baserel: *mut RelOptInfo,
+    _foreigntableid: Oid,
+) {
+    // get estimate row count and mean row width
+    // let (rows, width) = state.get_rel_size().report_unwrap();
+    // (*baserel).rows = rows as f64;
+    // (*(*baserel).reltarget).width = width;
 }
 
-//type  GenFun = fn (rng: &mut ThreadRng) -> Cell;
-// CellBuilder is the closure to generate value for a cell
-type CellBuilder = dyn Fn(&mut ChaCha8Rng) -> Cell;
-
-enum RandomFdwError {}
-
-impl From<RandomFdwError> for ErrorReport {
-    fn from(_value: RandomFdwError) -> Self {
-        ErrorReport::new(PgSqlErrorCode::ERRCODE_FDW_ERROR, "", "")
+#[pg_guard]
+pub extern "C" fn random_get_foreign_paths(
+    root: *mut pgrx::prelude::pg_sys::PlannerInfo,
+    baserel: *mut pgrx::prelude::pg_sys::RelOptInfo,
+    _foreigntableid: pgrx::prelude::pg_sys::Oid,
+) {
+    debug2!("---> get_foreign_paths");
+    unsafe {
+        // create a ForeignPath node and add it as the only possible path
+        let path = pgrx::prelude::pg_sys::create_foreignscan_path(
+            root,
+            baserel,
+            ptr::null_mut(), // default pathtarget
+            (*baserel).rows,
+            0.0,
+            0.0,
+            ptr::null_mut(), // no pathkeys
+            ptr::null_mut(), // no outer rel either
+            ptr::null_mut(), // no extra plan
+            ptr::null_mut(), // no fdw_private data
+        );
+        pgrx::prelude::pg_sys::add_path(baserel, &mut ((*path).path));
     }
 }
 
-type RandomFdwResult<T> = Result<T, RandomFdwError>;
-
-impl ForeignDataWrapper<RandomFdwError> for RandomFdw {
-    fn new(_options: &HashMap<String, String>) -> RandomFdwResult<Self> {
-        Ok(Self {
-            row_cnt: 0,
-            total_rows: 0,
-            rng: ChaCha8Rng::from_entropy(),
-            tgt_cols: Vec::new(),
-            fn_cols: Vec::new(),
-        })
+#[pg_guard]
+pub extern "C" fn get_foreign_plan(
+    _root: *mut pgrx::prelude::pg_sys::PlannerInfo,
+    baserel: *mut pgrx::prelude::pg_sys::RelOptInfo,
+    _foreigntableid: pgrx::prelude::pg_sys::Oid,
+    _best_path: *mut pgrx::prelude::pg_sys::ForeignPath,
+    tlist: *mut pgrx::prelude::pg_sys::List,
+    scan_clauses: *mut pgrx::prelude::pg_sys::List,
+    outer_plan: *mut pgrx::prelude::pg_sys::Plan,
+) -> *mut pgrx::prelude::pg_sys::ForeignScan {
+    debug2!("---> get_foreign_plan");
+    unsafe {
+        pgrx::prelude::pg_sys::make_foreignscan(
+            tlist,
+            scan_clauses,
+            (*baserel).relid,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            outer_plan,
+        )
     }
+}
 
-    fn begin_scan(
-        &mut self,
-        _quals: &[Qual],
-        columns: &[Column],
-        _sorts: &[Sort],
-        _limit: &Option<Limit>,
-        options: &HashMap<String, String>,
-    ) -> RandomFdwResult<()> {
-        // default is 1024
-        self.total_rows = match options.get(&"total".to_string()) {
-            Some(v) => v.parse::<u64>().unwrap_or(1024),
-            None => 1024,
-        };
+#[pg_guard]
+pub extern "C" fn random_begin_foreign_scan(
+    _node: *mut pgrx::prelude::pg_sys::ForeignScanState,
+    _eflags: c_int,
+) {
+    debug2!("---> begin_foreign_scan");
+}
 
-        self.row_cnt = 0;
+#[pg_guard]
+pub extern "C" fn random_re_scan_foreign_scan(_node: *mut pgrx::prelude::pg_sys::ForeignScanState) {
+    debug2!("---> re_scan_foreign_scan");
+}
 
-        // save a copy of target columns
-        self.tgt_cols = columns.to_vec();
+#[pg_guard]
+pub extern "C" fn random_end_foreign_scan(_node: *mut pgrx::prelude::pg_sys::ForeignScanState) {
+    debug2!("---> end_foreign_scan");
+}
 
-        for c in columns {
-            self.fn_cols.push(create_closure(c.type_oid, options))
+#[pg_guard]
+pub extern "C" fn random_iterate_foreign_scan(
+    node: *mut pgrx::prelude::pg_sys::ForeignScanState,
+) -> *mut pgrx::prelude::pg_sys::TupleTableSlot {
+    // `debug!` macros are quite expensive at the moment, so avoid logging in the inner loop
+    // debug2!("---> iterate_foreign_scan");
+    unsafe {
+        let mut rng = ChaCha8Rng::from_entropy();
+
+        // clear slot
+        let slot = (*node).ss.ss_ScanTupleSlot;
+        if let Some(clear) = (*(*slot).tts_ops).clear {
+            clear(slot);
         }
-        let seed = match options.get(&"seed".to_string()) {
-            Some(v) => v.parse::<u64>().unwrap_or(0),
-            None => 0,
-        };
 
-        if seed > 0 {
-            self.rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
-            //Faker.fake_with_rng(StdRng::from_seed(seed));
-        }
-        Ok(())
-    }
+        let tup_desc = (*slot).tts_tupleDescriptor;
 
-    fn iter_scan(&mut self, row: &mut Row) -> RandomFdwResult<Option<()>> {
-        // this is called on each row and we only return one row here
-        if self.row_cnt < self.total_rows {
-            // add values to row if they are in target column list
-            for (tgt_col, f) in zip(&self.tgt_cols, &mut self.fn_cols.iter()) {
-                row.push(tgt_col.name.as_str(), Some(apply_builder(f, &mut self.rng)));
+        let tuple_desc = PgTupleDesc::from_pg_copy(tup_desc);
+
+        for (col_index, attr) in tuple_desc.iter().enumerate() {
+            //eprintln!("{col_index}: {}", attr.atttypid);
+            let tts_isnull = (*slot).tts_isnull.add(col_index);
+            let tts_value = (*slot).tts_values.add(col_index);
+
+            match generate_random_data_for_oid(attr.atttypid, &mut rng) {
+                Some(v) => *tts_value = v,
+                None => *tts_isnull = true,
             }
-
-            self.row_cnt += 1;
-
-            // return Some(()) to Postgres and continue data scan
-            return Ok(Some(()));
+            // *tts_isnull = true;
         }
+        pgrx::prelude::pg_sys::ExecStoreVirtualTuple(slot);
 
-        // return 'None' to stop data scan
-        Ok(None)
-    }
-
-    fn end_scan(&mut self) -> RandomFdwResult<()> {
-        // we do nothing here, but you can do things like resource cleanup and etc.
-        Ok(())
+        slot
     }
 }
 
-fn create_closure(oid: Oid, _options: &HashMap<String, String>) -> Box<CellBuilder> {
-    let min = 10;
-    let max = 1000;
-    let _max_len = 29;
-    // Box::new(move |rng: &mut ThreadRng| -> Cell {
-    //     Cell::I64(rng.gen_range(min..max))
-    // })
-    match PgOid::from(oid) {
-        PgOid::BuiltIn(PgBuiltInOids::INT2OID) => Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
-            Cell::I16(rng.gen_range(min as i16..max as i16))
-        }),
-        PgOid::BuiltIn(PgBuiltInOids::INT4OID) => Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
-            Cell::I32(rng.gen_range(min as i32..max as i32))
-        }),
-        PgOid::BuiltIn(PgBuiltInOids::INT8OID) => {
-            Box::new(move |rng: &mut ChaCha8Rng| -> Cell { Cell::I64(rng.gen_range(min..max)) })
-        }
-        PgOid::BuiltIn(PgBuiltInOids::FLOAT4OID) => Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
-            Cell::F32(rng.gen_range(0 as f32..10 as f32))
-        }),
+pub static mut RANDOM_FDW_ROUTINE: pg_sys::FdwRoutine = pg_sys::FdwRoutine {
+    type_: pg_sys::NodeTag::T_FdwRoutine,
+    BeginForeignScan: Some(random_begin_foreign_scan),
+    IterateForeignScan: Some(random_iterate_foreign_scan),
+    ReScanForeignScan: Some(random_re_scan_foreign_scan),
+    EndForeignScan: Some(random_end_foreign_scan),
+    GetForeignJoinPaths: None,
+    GetForeignUpperPaths: None,
+    AddForeignUpdateTargets: None,
+    PlanForeignModify: None,
+    BeginForeignModify: None,
+    ExecForeignInsert: None,
+    ExecForeignBatchInsert: None,
+    GetForeignModifyBatchSize: None,
+    ExecForeignUpdate: None,
+    ExecForeignDelete: None,
+    EndForeignModify: None,
+    BeginForeignInsert: None,
+    EndForeignInsert: None,
+    IsForeignRelUpdatable: None,
+    PlanDirectModify: None,
+    BeginDirectModify: None,
+    IterateDirectModify: None,
+    EndDirectModify: None,
+    GetForeignRowMarkType: None,
+    RefetchForeignRow: None,
+    GetForeignRelSize: Some(random_get_foreign_rel_size),
+    GetForeignPaths: Some(random_get_foreign_paths),
+    GetForeignPlan: Some(get_foreign_plan),
+    ExplainForeignScan: None,
+    ExplainForeignModify: None,
+    ExplainDirectModify: None,
+    AnalyzeForeignTable: None,
+    ImportForeignSchema: None,
+    ExecForeignTruncate: None,
+    IsForeignScanParallelSafe: None,
+    EstimateDSMForeignScan: None,
+    InitializeDSMForeignScan: None,
+    ReInitializeDSMForeignScan: None,
+    InitializeWorkerForeignScan: None,
+    ShutdownForeignScan: None,
+    ReparameterizeForeignPathByChild: None,
+    IsForeignPathAsyncCapable: None,
+    ForeignAsyncRequest: None,
+    ForeignAsyncConfigureWait: None,
+    RecheckForeignScan: None,
+    ForeignAsyncNotify: None,
+};
 
-        PgOid::BuiltIn(PgBuiltInOids::FLOAT8OID) => Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
-            Cell::F64(rng.gen_range(0 as f64..10 as f64))
-        }),
-        PgOid::BuiltIn(PgBuiltInOids::NUMERICOID) => {
-            Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
-                Cell::Numeric(
-                    AnyNumeric::try_from(
-                        (100 as f32..1000 as f32).fake_with_rng::<f32, ChaCha8Rng>(rng),
-                    )
-                    .unwrap_or_default(),
-                )
-            })
-        }
-
-        PgOid::BuiltIn(PgBuiltInOids::CHAROID) => {
-            Box::new(move |rng: &mut ChaCha8Rng| -> Cell { Cell::I8(rng.gen()) })
-        }
-
-        PgOid::BuiltIn(PgBuiltInOids::TEXTOID) => Box::new(move |rng: &mut ChaCha8Rng| -> Cell {
-            Cell::String((10..20).fake_with_rng::<String, ChaCha8Rng>(rng))
-        }),
-        _ => Box::new(move |_rng: &mut ChaCha8Rng| -> Cell { Cell::String(String::from("")) }),
-    }
+#[pg_guard]
+#[no_mangle]
+extern "C" fn pg_finfo_random_fdw_handler() -> &'static pg_sys::Pg_finfo_record {
+    const V1_API: pg_sys::Pg_finfo_record = pg_sys::Pg_finfo_record { api_version: 1 };
+    &V1_API
 }
 
-fn apply_builder<F>(f: F, rng: &mut ChaCha8Rng) -> Cell
-where
-    F: Fn(&mut ChaCha8Rng) -> Cell,
-{
-    f(rng)
+extension_sql!(
+    r#"
+CREATE FUNCTION random_fdw_handler()
+RETURNS fdw_handler AS 'MODULE_PATHNAME', 'random_fdw_handler' LANGUAGE C STRICT;
+"#,
+    name = "random_fdw_handler"
+);
+
+#[no_mangle]
+#[pg_guard]
+extern "C" fn random_fdw_handler(_fcinfo: pg_sys::FunctionCallInfo) -> *mut pg_sys::FdwRoutine {
+    unsafe { addr_of_mut!(RANDOM_FDW_ROUTINE) }
 }

@@ -80,19 +80,19 @@ unsafe fn random_scan_getnextslot_impl(
     _scan: pg_sys::TableScanDesc,
     slot: *mut pg_sys::TupleTableSlot,
 ) -> bool {
-    //eprintln!("in scan_getnextslot");
-    if let Some(clear) = (*slot).tts_ops.as_ref().unwrap().clear {
-        clear(slot);
-    }
-
+    //log!("in scan_getnextslot {:#?}", slot);
     let mut rng = ChaCha8Rng::from_entropy();
 
     let tup_desc = (*slot).tts_tupleDescriptor;
 
-    let tuple_desc = PgTupleDesc::from_pg_unchecked(tup_desc);
+    let tuple_desc = PgTupleDesc::from_pg_copy(tup_desc);
+
+    if let Some(clear) = (*slot).tts_ops.as_ref().unwrap().clear {
+        clear(slot);
+    }
 
     for (col_index, attr) in tuple_desc.iter().enumerate() {
-        eprintln!("{col_index}: {}", attr.atttypid);
+        //eprintln!("{col_index}: {}", attr.atttypid);
         let tts_isnull = (*slot).tts_isnull.add(col_index);
         let tts_value = (*slot).tts_values.add(col_index);
 
@@ -100,8 +100,28 @@ unsafe fn random_scan_getnextslot_impl(
             Some(v) => *tts_value = v,
             None => *tts_isnull = true,
         }
+        // *tts_isnull = true;
     }
+
+    // let mut values: Vec<Datum> = vec![];
+    // let mut nulls: Vec<bool> = vec![];
+    // for (col_index, attr) in tuple_desc.iter().enumerate() {
+    //     nulls.push(false);
+    //     match generate_random_data_for_oid(attr.atttypid, &mut rng) {
+    //         Some(v) => values.push(v),
+    //         None => {
+    //             values.push(Datum::from(0));
+    //             nulls[col_index] = true
+    //         }
+    //     }
+    //     // *tts_isnull = true;
+    // }
+    //
+    // (*slot).tts_values = values.as_mut_ptr();
+    // (*slot).tts_isnull = nulls.as_mut_ptr();
+
     pg_sys::ExecStoreVirtualTuple(slot);
+
     true
 }
 
