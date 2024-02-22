@@ -1,3 +1,4 @@
+use core::ffi::c_char;
 use pgrx::pg_sys::*;
 use pgrx::*;
 
@@ -193,6 +194,7 @@ pub extern "C" fn random_tuple_delete(
 }
 
 #[pg_guard]
+#[cfg(any(feature = "pg15"))]
 pub extern "C" fn random_tuple_update(
     _rel: pg_sys::Relation,
     _otid: pg_sys::ItemPointer,
@@ -208,12 +210,38 @@ pub extern "C" fn random_tuple_update(
     0
 }
 
+#[pg_guard]
+#[cfg(feature = "pg16")]
+pub extern "C" fn random_tuple_update(
+    _rel: pg_sys::Relation,
+    _otid: pg_sys::ItemPointer,
+    _slot: *mut pg_sys::TupleTableSlot,
+    _cid: pg_sys::CommandId,
+    _snapshot: pg_sys::Snapshot,
+    _crosscheck: pg_sys::Snapshot,
+    _wait: bool,
+    _tmfd: *mut pg_sys::TM_FailureData,
+    _lockmode: *mut pg_sys::LockTupleMode,
+    _update_indexes: *mut pg_sys::TU_UpdateIndexes,
+) -> pg_sys::TM_Result {
+    0
+}
+
 pub extern "C" fn random_relation_nontransactional_truncate(_rel: pg_sys::Relation) {}
 
 #[pg_guard]
+#[cfg(any(feature = "pg15"))]
 pub extern "C" fn random_relation_copy_data(
     _rel: pg_sys::Relation,
     _newrnode: *const pg_sys::RelFileNode,
+) {
+}
+
+#[pg_guard]
+#[cfg(feature = "pg16")]
+pub extern "C" fn random_relation_copy_data(
+    _rel: pg_sys::Relation,
+    _newrnode: *const pg_sys::RelFileLocator,
 ) {
 }
 
@@ -345,6 +373,7 @@ pub extern "C" fn random_scan_sample_next_tuple(
 }
 
 #[pg_guard]
+#[cfg(any(feature = "pg15"))]
 pub extern "C" fn deltalake_relation_set_new_filenode(
     _rel: pg_sys::Relation,
     _newrnode: *const pg_sys::RelFileNode,
@@ -396,4 +425,15 @@ pub extern "C" fn random_slot_callbacks(
     _rel: pg_sys::Relation,
 ) -> *const pg_sys::TupleTableSlotOps {
     unsafe { &pg_sys::TTSOpsVirtual }
+}
+
+#[pg_guard]
+#[cfg(feature = "pg16")]
+pub extern "C" fn random_relation_set_new_filelocator(
+    _rel: pg_sys::Relation,
+    _newrlocator: *const pg_sys::RelFileLocator,
+    _persistence: c_char,
+    _freeze_xid: *mut pg_sys::TransactionId,
+    _minmulti: *mut pg_sys::MultiXactId,
+) {
 }

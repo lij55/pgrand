@@ -103,23 +103,6 @@ unsafe fn random_scan_getnextslot_impl(
         // *tts_isnull = true;
     }
 
-    // let mut values: Vec<Datum> = vec![];
-    // let mut nulls: Vec<bool> = vec![];
-    // for (col_index, attr) in tuple_desc.iter().enumerate() {
-    //     nulls.push(false);
-    //     match generate_random_data_for_oid(attr.atttypid, &mut rng) {
-    //         Some(v) => values.push(v),
-    //         None => {
-    //             values.push(Datum::from(0));
-    //             nulls[col_index] = true
-    //         }
-    //     }
-    //     // *tts_isnull = true;
-    // }
-    //
-    // (*slot).tts_values = values.as_mut_ptr();
-    // (*slot).tts_isnull = nulls.as_mut_ptr();
-
     pg_sys::ExecStoreVirtualTuple(slot);
 
     true
@@ -178,6 +161,8 @@ pub static mut RANDOM_TABLE_AM_ROUTINE: pg_sys::TableAmRoutine = pg_sys::TableAm
     scan_getnextslot_tidrange: Some(random_scan_getnextslot_tidrange),
     #[cfg(any(feature = "pg14", feature = "pg15", feature = "pg16"))]
     index_delete_tuples: Some(random_index_delete_tuples),
+    #[cfg(any(feature = "pg16"))]
+    relation_set_new_filelocator: Some(random_relation_set_new_filelocator),
 };
 
 #[pg_guard]
