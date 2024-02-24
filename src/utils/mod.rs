@@ -194,8 +194,8 @@ pub fn generate_random_data_for_oid(oid: Oid, rng: &mut ChaCha8Rng) -> Option<Da
             Date::from_pg_epoch_days(rng.gen_range(1 * 360..50 * 360)).into_datum()
         },
         TIMEOID => {
-            let s = faker::time::en::Date().fake_with_rng(rng);
-            Time::from_str(&s).unwrap().into_datum()
+            let s:String = faker::time::en::Date().fake_with_rng(rng);
+            Time::from_str(s.as_str()).unwrap().into_datum()
         },
         TIMESTAMPOID => None,
         UUIDOID => None,
