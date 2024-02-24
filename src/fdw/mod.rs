@@ -1,8 +1,10 @@
 use crate::utils::generate_random_data_for_oid;
 use pgrx::pg_sys::*;
-use pgrx::{extension_sql, pg_guard, pg_sys, PgTupleDesc};
+use pgrx::{extension_sql, pg_guard, pg_sys, PgBox, PgList, PgTupleDesc};
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha8Rng;
+use std::collections::HashMap;
+use std::ffi::CStr;
 use std::os::raw::c_int;
 use std::ptr;
 use std::ptr::addr_of_mut;
@@ -69,12 +71,33 @@ pub extern "C" fn get_foreign_plan(
     }
 }
 
+type Options = HashMap<std::string::String, std::string::String>;
+
+struct RandomFdwStat {
+    pub test: u8,
+    pub rng: ChaCha8Rng,
+    pub opts: Options,
+}
+
 #[pg_guard]
 pub extern "C" fn random_begin_foreign_scan(
-    _node: *mut pgrx::prelude::pg_sys::ForeignScanState,
+    node: *mut pgrx::prelude::pg_sys::ForeignScanState,
     _eflags: c_int,
 ) {
     debug2!("---> begin_foreign_scan");
+    unsafe {
+        let mut my_fdw_state = PgBox::<RandomFdwStat>::alloc0();
+        my_fdw_state.test = 100;
+        my_fdw_state.rng = ChaCha8Rng::seed_from_u64(1);
+
+        let foreign_table_id = (*((*node).ss.ss_currentRelation)).rd_id;
+
+        let ftable = pg_sys::GetForeignTable(foreign_table_id);
+
+        my_fdw_state.opts = options_to_hashmap((*ftable).options).unwrap();
+
+        (*node).fdw_state = my_fdw_state.into_pg() as *mut ::std::os::raw::c_void;
+    }
 }
 
 #[pg_guard]
@@ -83,8 +106,14 @@ pub extern "C" fn random_re_scan_foreign_scan(_node: *mut pgrx::prelude::pg_sys:
 }
 
 #[pg_guard]
-pub extern "C" fn random_end_foreign_scan(_node: *mut pgrx::prelude::pg_sys::ForeignScanState) {
+pub extern "C" fn random_end_foreign_scan(node: *mut pgrx::prelude::pg_sys::ForeignScanState) {
     debug2!("---> end_foreign_scan");
+    unsafe {
+        let mut my_fdw_stat =
+            PgBox::<RandomFdwStat>::from_pg((*node).fdw_state as *mut RandomFdwStat);
+        debug2!("{}", my_fdw_stat.test);
+        debug2!("{:?}", my_fdw_stat.opts.as_ref().unwrap());
+    }
 }
 
 #[pg_guard]
@@ -94,7 +123,11 @@ pub extern "C" fn random_iterate_foreign_scan(
     // `debug!` macros are quite expensive at the moment, so avoid logging in the inner loop
     // debug2!("---> iterate_foreign_scan");
     unsafe {
-        let mut rng = ChaCha8Rng::from_entropy();
+        let mut my_fdw_stat =
+            PgBox::<RandomFdwStat>::from_pg((*node).fdw_state as *mut RandomFdwStat);
+        //let mut rng = ChaCha8Rng::from_entropy();
+
+        let mut rng = (*my_fdw_stat).rng.clone();
 
         // clear slot
         let slot = (*node).ss.ss_ScanTupleSlot;
@@ -191,4 +224,20 @@ RETURNS fdw_handler AS 'MODULE_PATHNAME', 'random_fdw_handler' LANGUAGE C STRICT
 #[pg_guard]
 extern "C" fn random_fdw_handler(_fcinfo: pg_sys::FunctionCallInfo) -> *mut pg_sys::FdwRoutine {
     unsafe { addr_of_mut!(RANDOM_FDW_ROUTINE) }
+}
+
+// convert options definition to hashmap
+pub unsafe fn options_to_hashmap(
+    options: *mut pg_sys::List,
+) -> Option<HashMap<std::string::String, std::string::String>> {
+    let mut ret = HashMap::new();
+    let options: PgList<pg_sys::DefElem> = PgList::from_pg(options);
+    for option in options.iter_ptr() {
+        let name = CStr::from_ptr((*option).defname);
+        let value = CStr::from_ptr(pg_sys::defGetString(option));
+        let name = name.to_str().unwrap();
+        let value = value.to_str().unwrap();
+        ret.insert(name.to_string(), value.to_string());
+    }
+    Some(ret)
 }
