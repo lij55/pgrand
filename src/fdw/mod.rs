@@ -112,7 +112,7 @@ pub extern "C" fn random_end_foreign_scan(node: *mut pgrx::prelude::pg_sys::Fore
         let mut my_fdw_stat =
             PgBox::<RandomFdwStat>::from_pg((*node).fdw_state as *mut RandomFdwStat);
         debug2!("{}", my_fdw_stat.test);
-        debug2!("{:?}", my_fdw_stat.opts.as_ref().unwrap());
+        debug2!("{:?}", my_fdw_stat.opts);
     }
 }
 

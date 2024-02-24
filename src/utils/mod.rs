@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+
+use std::str::FromStr;
 use fake::Fake;
 use pgrx::pg_sys::*;
 use pgrx::{AnyNumeric, Date, GucContext, GucFlags, GucRegistry, GucSetting, IntoDatum, Time};
@@ -6,6 +8,8 @@ use pgrx::{AnyNumeric, Date, GucContext, GucFlags, GucRegistry, GucSetting, Into
 use rand::Rng;
 use rand_chacha;
 use rand_chacha::ChaCha8Rng;
+
+use fake::faker;
 
 pub struct RandomGUC {
     pub min_integer: GucSetting<i32>,
@@ -189,7 +193,10 @@ pub fn generate_random_data_for_oid(oid: Oid, rng: &mut ChaCha8Rng) -> Option<Da
         DATEOID => unsafe {
             Date::from_pg_epoch_days(rng.gen_range(1 * 360..50 * 360)).into_datum()
         },
-        TIMEOID => Time::new(2, 10, 20.0).into_datum(),
+        TIMEOID => {
+            let s = faker::time::en::Date().fake_with_rng(rng);
+            Time::from_str(&s).unwrap().into_datum()
+        },
         TIMESTAMPOID => None,
         UUIDOID => None,
         _ => None,
