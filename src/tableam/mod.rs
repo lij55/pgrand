@@ -60,7 +60,7 @@ pub extern "C" fn random_scan_getnextslot(
 ) -> bool {
     unsafe {
         let mut rng = ChaCha8Rng::from_entropy();
-        let random_scan = scan as RandomScanDesc;
+        let _random_scan = scan as RandomScanDesc;
         if let Some(clear) = (*slot).tts_ops.as_ref().unwrap().clear {
             clear(slot);
         }

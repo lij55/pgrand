@@ -3,11 +3,12 @@
 mod data;
 pub mod guc;
 
-use fake::Fake;
 use pgrx::pg_sys::*;
-use pgrx::{AnyNumeric, Date, GucContext, GucFlags, GucRegistry, GucSetting, IntoDatum, Time};
+use pgrx::{AnyNumeric, Date, Inet,  IntoDatum, Time, Uuid};
 use std::str::FromStr;
+use data::*;
 
+use fake::{ Fake, Faker};
 use fake::faker;
 use guc::PARADE_GUC;
 use rand::Rng;
@@ -106,14 +107,23 @@ pub fn generate_random_data_for_oid(oid: Oid, rng: &mut ChaCha8Rng) -> Option<Da
             Date::from_str(s.as_str()).unwrap().into_datum()
         }
         TIMEOID => {
-            let s: std::string::String = faker::time::en::Time().fake_with_rng(rng);
+            let s: std::string::String = random_time(rng);
+
             Time::from_str(s.as_str()).unwrap().into_datum()
         }
         TIMESTAMPOID => {
-            let s: std::string::String = faker::time::en::DateTime().fake_with_rng(rng);
-            Timestamp::from_str(s.as_str()).unwrap().into_datum()
+            Timestamp::from(rng
+                .gen_range(i64::MIN / 128 ..i64::MAX / 1024 )).into_datum()
         }
-        UUIDOID => None,
+        UUIDOID => {
+            let bytes = Faker.fake::<[u8; 16]>();
+            Uuid::from_bytes(bytes).into_datum()
+        },
+
+        INETOID =>{
+            let addr = random_ip(rng);
+            Inet::from(addr).into_datum()
+        },
         _ => None,
     }
 }

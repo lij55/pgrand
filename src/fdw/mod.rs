@@ -118,13 +118,13 @@ pub extern "C" fn random_re_scan_foreign_scan(_node: *mut pgrx::prelude::pg_sys:
 }
 
 #[pg_guard]
-pub extern "C" fn random_end_foreign_scan(node: *mut pgrx::prelude::pg_sys::ForeignScanState) {
+pub extern "C" fn random_end_foreign_scan(_node: *mut pgrx::prelude::pg_sys::ForeignScanState) {
     debug2!("---> end_foreign_scan");
-    unsafe {
+    // unsafe {
         // let mut my_fdw_stat =
         //     PgBox::<RandomFdwStat>::from_pg((*node).fdw_state as *mut RandomFdwStat);
         // // debug2!("{:?}", my_fdw_stat.opts);
-    }
+    // }
 }
 
 #[pg_guard]

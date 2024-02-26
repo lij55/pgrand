@@ -15,7 +15,7 @@ pub const TIMESTAMPOID: Oid = Oid(1114);
 pub const TIMESTAMPTZOID: Oid = Oid(1184);
 pub const TIMETZOID: Oid = Oid(1266);
 pub const NUMERICOID: Oid = Oid(1700);
-
+pub const BPCHAROID: Oid = Oid(1042);
 
 pub const UUIDOID: Oid = Oid(2950);
 pub const MACADDROID: Oid = Oid(829);
@@ -37,7 +37,6 @@ pub const MONEYOID: Oid = Oid(790);
 pub const CIDROID: Oid = Oid(650);
 pub const MACADDR8OID: Oid = Oid(774);
 pub const ACLITEMOID: Oid = Oid(1033);
-pub const BPCHAROID: Oid = Oid(1042);
 
 pub const BITOID: Oid = Oid(1560);
 pub const VARBITOID: Oid = Oid(1562);
