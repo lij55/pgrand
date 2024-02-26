@@ -2,7 +2,7 @@ mod fdw;
 mod tableam;
 mod utils;
 
-use crate::utils::PARADE_GUC;
+use crate::utils::guc::PARADE_GUC;
 use pgrx::*;
 
 pgrx::pg_module_magic!();

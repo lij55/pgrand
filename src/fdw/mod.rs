@@ -1,4 +1,5 @@
 use crate::utils::generate_random_data_for_oid;
+use crate::utils::guc::PARADE_GUC;
 use pgrx::pg_sys::*;
 use pgrx::{extension_sql, pg_guard, pg_sys, PgBox, PgList, PgTupleDesc};
 use rand_chacha::rand_core::SeedableRng;
@@ -74,9 +75,10 @@ pub extern "C" fn get_foreign_plan(
 type Options = HashMap<std::string::String, std::string::String>;
 
 struct RandomFdwStat {
-    pub test: u8,
     pub rng: ChaCha8Rng,
     pub opts: Options,
+    pub total: u64,
+    pub current: u64,
 }
 
 #[pg_guard]
@@ -87,14 +89,24 @@ pub extern "C" fn random_begin_foreign_scan(
     debug2!("---> begin_foreign_scan");
     unsafe {
         let mut my_fdw_state = PgBox::<RandomFdwStat>::alloc0();
-        my_fdw_state.test = 100;
-        my_fdw_state.rng = ChaCha8Rng::seed_from_u64(1);
+        my_fdw_state.rng = match PARADE_GUC.seed.get() {
+            0 => ChaCha8Rng::from_entropy(),
+            _ => ChaCha8Rng::seed_from_u64(PARADE_GUC.seed.get() as u64),
+        };
 
         let foreign_table_id = (*((*node).ss.ss_currentRelation)).rd_id;
 
         let ftable = pg_sys::GetForeignTable(foreign_table_id);
 
         my_fdw_state.opts = options_to_hashmap((*ftable).options).unwrap();
+        my_fdw_state.total = my_fdw_state
+            .opts
+            .get("total".into())
+            .unwrap_or(&format!("1024"))
+            .parse()
+            .unwrap_or(0);
+
+        my_fdw_state.current = 0;
 
         (*node).fdw_state = my_fdw_state.into_pg() as *mut ::std::os::raw::c_void;
     }
@@ -109,10 +121,9 @@ pub extern "C" fn random_re_scan_foreign_scan(_node: *mut pgrx::prelude::pg_sys:
 pub extern "C" fn random_end_foreign_scan(node: *mut pgrx::prelude::pg_sys::ForeignScanState) {
     debug2!("---> end_foreign_scan");
     unsafe {
-        let mut my_fdw_stat =
-            PgBox::<RandomFdwStat>::from_pg((*node).fdw_state as *mut RandomFdwStat);
-        debug2!("{}", my_fdw_stat.test);
-        debug2!("{:?}", my_fdw_stat.opts);
+        // let mut my_fdw_stat =
+        //     PgBox::<RandomFdwStat>::from_pg((*node).fdw_state as *mut RandomFdwStat);
+        // // debug2!("{:?}", my_fdw_stat.opts);
     }
 }
 
@@ -120,38 +131,37 @@ pub extern "C" fn random_end_foreign_scan(node: *mut pgrx::prelude::pg_sys::Fore
 pub extern "C" fn random_iterate_foreign_scan(
     node: *mut pgrx::prelude::pg_sys::ForeignScanState,
 ) -> *mut pgrx::prelude::pg_sys::TupleTableSlot {
-    // `debug!` macros are quite expensive at the moment, so avoid logging in the inner loop
     // debug2!("---> iterate_foreign_scan");
     unsafe {
         let mut my_fdw_stat =
             PgBox::<RandomFdwStat>::from_pg((*node).fdw_state as *mut RandomFdwStat);
-        //let mut rng = ChaCha8Rng::from_entropy();
 
-        let mut rng = (*my_fdw_stat).rng.clone();
+        let slot = (*node).ss.ss_ScanTupleSlot;
 
         // clear slot
-        let slot = (*node).ss.ss_ScanTupleSlot;
         if let Some(clear) = (*(*slot).tts_ops).clear {
             clear(slot);
         }
 
-        let tup_desc = (*slot).tts_tupleDescriptor;
+        if (*my_fdw_stat).total > 0 && (*my_fdw_stat).total > (*my_fdw_stat).current {
+            (*my_fdw_stat).current += 1;
+            let mut rng = &mut (*my_fdw_stat).rng;
 
-        let tuple_desc = PgTupleDesc::from_pg_copy(tup_desc);
+            let tup_desc = (*slot).tts_tupleDescriptor;
 
-        for (col_index, attr) in tuple_desc.iter().enumerate() {
-            //eprintln!("{col_index}: {}", attr.atttypid);
-            let tts_isnull = (*slot).tts_isnull.add(col_index);
-            let tts_value = (*slot).tts_values.add(col_index);
+            let tuple_desc = PgTupleDesc::from_pg_copy(tup_desc);
 
-            match generate_random_data_for_oid(attr.atttypid, &mut rng) {
-                Some(v) => *tts_value = v,
-                None => *tts_isnull = true,
+            for (col_index, attr) in tuple_desc.iter().enumerate() {
+                let tts_isnull = (*slot).tts_isnull.add(col_index);
+                let tts_value = (*slot).tts_values.add(col_index);
+
+                match generate_random_data_for_oid(attr.atttypid, &mut rng) {
+                    Some(v) => *tts_value = v,
+                    None => *tts_isnull = true,
+                }
             }
-            // *tts_isnull = true;
+            pgrx::prelude::pg_sys::ExecStoreVirtualTuple(slot);
         }
-        pgrx::prelude::pg_sys::ExecStoreVirtualTuple(slot);
-
         slot
     }
 }

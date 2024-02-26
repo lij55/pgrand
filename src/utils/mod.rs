@@ -1,107 +1,18 @@
 #![allow(dead_code)]
 
-use std::str::FromStr;
+mod data;
+pub mod guc;
+
 use fake::Fake;
 use pgrx::pg_sys::*;
 use pgrx::{AnyNumeric, Date, GucContext, GucFlags, GucRegistry, GucSetting, IntoDatum, Time};
+use std::str::FromStr;
 
+use fake::faker;
+use guc::PARADE_GUC;
 use rand::Rng;
 use rand_chacha;
 use rand_chacha::ChaCha8Rng;
-
-use fake::faker;
-
-pub struct RandomGUC {
-    pub min_integer: GucSetting<i32>,
-    pub max_integer: GucSetting<i32>,
-    pub min_text_length: GucSetting<i32>,
-    pub max_text_length: GucSetting<i32>,
-    pub array_length: GucSetting<i32>,
-    pub float_scale: GucSetting<i32>,
-}
-
-impl RandomGUC {
-    pub const fn new() -> Self {
-        Self {
-            min_integer: GucSetting::<i32>::new(-10000),
-            max_integer: GucSetting::<i32>::new(10000),
-            min_text_length: GucSetting::<i32>::new(30000),
-            max_text_length: GucSetting::<i32>::new(50000),
-            array_length: GucSetting::<i32>::new(1024),
-            float_scale: GucSetting::<i32>::new(1),
-        }
-    }
-
-    pub fn init(&self) {
-        GucRegistry::define_int_guc(
-            "random.min_int",
-            "",
-            "",
-            &self.min_integer,
-            i32::MIN,
-            i32::MAX,
-            GucContext::Userset,
-            GucFlags::default(),
-        );
-
-        GucRegistry::define_int_guc(
-            "random.max_int",
-            "",
-            "",
-            &self.max_integer,
-            i32::MIN,
-            i32::MAX,
-            GucContext::Userset,
-            GucFlags::default(),
-        );
-
-        GucRegistry::define_int_guc(
-            "random.min_text_length",
-            "",
-            "",
-            &self.min_text_length,
-            3,
-            i32::MAX,
-            GucContext::Userset,
-            GucFlags::default(),
-        );
-
-        GucRegistry::define_int_guc(
-            "random.max_text_length",
-            "",
-            "",
-            &self.max_text_length,
-            3,
-            i32::MAX,
-            GucContext::Userset,
-            GucFlags::default(),
-        );
-
-        GucRegistry::define_int_guc(
-            "random.array_length",
-            "",
-            "",
-            &self.array_length,
-            1,
-            16384,
-            GucContext::Userset,
-            GucFlags::default(),
-        );
-
-        GucRegistry::define_int_guc(
-            "random.float_scale",
-            "",
-            "",
-            &self.float_scale,
-            1,
-            i32::MAX,
-            GucContext::Userset,
-            GucFlags::default(),
-        );
-    }
-}
-
-pub static PARADE_GUC: RandomGUC = RandomGUC::new();
 
 pub type DataBuilder = dyn Fn(&mut ChaCha8Rng) -> Option<Datum>;
 
@@ -190,14 +101,18 @@ pub fn generate_random_data_for_oid(oid: Oid, rng: &mut ChaCha8Rng) -> Option<Da
             .fake_with_rng::<std::string::String, ChaCha8Rng>(rng)
             .into_datum(),
 
-        DATEOID => unsafe {
-            Date::from_pg_epoch_days(rng.gen_range(1 * 360..50 * 360)).into_datum()
-        },
-        TIMEOID => {
+        DATEOID => {
             let s: std::string::String = faker::time::en::Date().fake_with_rng(rng);
+            Date::from_str(s.as_str()).unwrap().into_datum()
+        }
+        TIMEOID => {
+            let s: std::string::String = faker::time::en::Time().fake_with_rng(rng);
             Time::from_str(s.as_str()).unwrap().into_datum()
-        },
-        TIMESTAMPOID => None,
+        }
+        TIMESTAMPOID => {
+            let s: std::string::String = faker::time::en::DateTime().fake_with_rng(rng);
+            Timestamp::from_str(s.as_str()).unwrap().into_datum()
+        }
         UUIDOID => None,
         _ => None,
     }
