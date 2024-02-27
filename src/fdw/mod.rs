@@ -75,7 +75,7 @@ pub extern "C" fn get_foreign_plan(
 type Options = HashMap<std::string::String, std::string::String>;
 
 struct RandomFdwStat {
-    pub rng: ChaCha8Rng,
+    pub rng: Box<ChaCha8Rng>,
     pub opts: Options,
     pub total: u64,
     pub current: u64,
@@ -90,8 +90,8 @@ pub extern "C" fn random_begin_foreign_scan(
     unsafe {
         let mut my_fdw_state = PgBox::<RandomFdwStat>::alloc0();
         my_fdw_state.rng = match PARADE_GUC.seed.get() {
-            0 => ChaCha8Rng::from_entropy(),
-            _ => ChaCha8Rng::seed_from_u64(PARADE_GUC.seed.get() as u64),
+            0 => Box::from(ChaCha8Rng::from_entropy()),
+            _ => Box::from(ChaCha8Rng::seed_from_u64(PARADE_GUC.seed.get() as u64)),
         };
 
         let foreign_table_id = (*((*node).ss.ss_currentRelation)).rd_id;
@@ -102,7 +102,7 @@ pub extern "C" fn random_begin_foreign_scan(
         my_fdw_state.total = my_fdw_state
             .opts
             .get("total".into())
-            .unwrap_or(&format!("1024"))
+            .unwrap_or(&format!("1000"))
             .parse()
             .unwrap_or(0);
 
@@ -121,9 +121,9 @@ pub extern "C" fn random_re_scan_foreign_scan(_node: *mut pgrx::prelude::pg_sys:
 pub extern "C" fn random_end_foreign_scan(_node: *mut pgrx::prelude::pg_sys::ForeignScanState) {
     debug2!("---> end_foreign_scan");
     // unsafe {
-        // let mut my_fdw_stat =
-        //     PgBox::<RandomFdwStat>::from_pg((*node).fdw_state as *mut RandomFdwStat);
-        // // debug2!("{:?}", my_fdw_stat.opts);
+    // let mut my_fdw_stat =
+    //     PgBox::<RandomFdwStat>::from_pg((*node).fdw_state as *mut RandomFdwStat);
+    // // debug2!("{:?}", my_fdw_stat.opts);
     // }
 }
 

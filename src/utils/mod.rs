@@ -3,13 +3,13 @@
 mod data;
 pub mod guc;
 
-use pgrx::pg_sys::*;
-use pgrx::{AnyNumeric, Date, Inet,  IntoDatum, Time, Uuid};
-use std::str::FromStr;
 use data::*;
+use pgrx::pg_sys::*;
+use pgrx::{AnyNumeric, Date, Inet, IntoDatum, Time, Uuid};
+use std::str::FromStr;
 
-use fake::{ Fake, Faker};
 use fake::faker;
+use fake::{Fake, Faker};
 use guc::PARADE_GUC;
 use rand::Rng;
 use rand_chacha;
@@ -54,7 +54,7 @@ pub fn generate_random_data_for_oid(oid: Oid, rng: &mut ChaCha8Rng) -> Option<Da
     let max_text_len = PARADE_GUC.max_text_length.get() as usize;
     let array_len = PARADE_GUC.array_length.get() as u32;
     let float_factor: u32 = PARADE_GUC.float_scale.get() as u32;
-
+    // log!("{oid}");
     match oid {
         INT2OID => rng.gen_range(min_int / 2 as i16..max_int).into_datum(),
         INT4OID => rng.gen_range(min_int..max_int).into_datum(),
@@ -112,18 +112,17 @@ pub fn generate_random_data_for_oid(oid: Oid, rng: &mut ChaCha8Rng) -> Option<Da
             Time::from_str(s.as_str()).unwrap().into_datum()
         }
         TIMESTAMPOID => {
-            Timestamp::from(rng
-                .gen_range(i64::MIN / 128 ..i64::MAX / 1024 )).into_datum()
+            Timestamp::from(rng.gen_range(i64::MIN / 128..i64::MAX / 1024)).into_datum()
         }
         UUIDOID => {
             let bytes = Faker.fake::<[u8; 16]>();
             Uuid::from_bytes(bytes).into_datum()
-        },
+        }
 
-        INETOID =>{
+        INETOID => {
             let addr = random_ip(rng);
             Inet::from(addr).into_datum()
-        },
+        }
         _ => None,
     }
 }
