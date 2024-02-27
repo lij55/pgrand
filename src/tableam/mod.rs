@@ -12,10 +12,14 @@ use rand_chacha::ChaCha8Rng;
 
 use crate::tableam::functions::*;
 
-struct RandomScanDesc {
-    pub rs_base: pg_sys::TableScanDescData,
-    pub rng: ChaCha8Rng,
+struct RandomScanData {
+    pub base: TableScanDescData,
+    // private state
+    // it will cause `sscan->rs_rd` become to 0
+    //pub rng: ChaCha8Rng,
 }
+
+type RandomScanDesc = *mut RandomScanData;
 
 #[pg_guard]
 pub extern "C" fn random_scan_begin(
@@ -28,40 +32,45 @@ pub extern "C" fn random_scan_begin(
 ) -> TableScanDesc {
     //eprintln!("in scan_begin");
 
-    Box::leak(Box::new(TableScanDescData {
-        rs_rd: rel,
-        rs_snapshot: snapshot,
-        rs_nkeys: nkeys,
-        rs_key: key,
-        rs_mintid: ItemPointerData {
-            ip_blkid: BlockIdData { bi_hi: 0, bi_lo: 0 },
-            ip_posid: 0,
-        },
-        rs_maxtid: ItemPointerData {
-            ip_blkid: BlockIdData { bi_hi: 0, bi_lo: 0 },
-            ip_posid: 0,
-        },
-        rs_flags: flags,
-        rs_parallel: pscan,
-    }))
+    unsafe {
+        //let mut scan = PgBox::<TableScanDescData>::alloc0();
+        let mut scan = PgBox::<RandomScanData>::alloc0();
+
+        scan.base.rs_rd = rel;
+        scan.base.rs_snapshot = snapshot;
+        scan.base.rs_nkeys = nkeys;
+        scan.base.rs_key = key;
+        scan.base.rs_parallel = pscan;
+        scan.base.rs_flags = flags;
+
+        // scan.rng = ChaCha8Rng::from_entropy();
+        // log!("{:?}", scan.rng);
+
+        scan.into_pg() as TableScanDesc
+    }
 }
+
+//static mut MEMCTX: PgMemoryContexts = PgMemoryContexts::new("pg_search_index_build");
 
 #[pg_guard]
 pub extern "C" fn random_scan_getnextslot(
-    _scan: TableScanDesc,
+    scan: TableScanDesc,
     _direction: ScanDirection,
     slot: *mut TupleTableSlot,
 ) -> bool {
     unsafe {
         let mut rng = ChaCha8Rng::from_entropy();
+        let _random_scan = scan as RandomScanDesc;
+        if let Some(clear) = (*slot).tts_ops.as_ref().unwrap().clear {
+            clear(slot);
+        }
+
+        //let mut oldctx = PgMemoryContexts::set_as_current(&mut *(*random_scan).memctx_ptr);
+        //PgMemoryContexts::CurrentMemoryContext.reset();
 
         let tup_desc = (*slot).tts_tupleDescriptor;
 
         let tuple_desc = PgTupleDesc::from_pg_copy(tup_desc);
-
-        if let Some(clear) = (*slot).tts_ops.as_ref().unwrap().clear {
-            clear(slot);
-        }
 
         for (col_index, attr) in tuple_desc.iter().enumerate() {
             //eprintln!("{col_index}: {}", attr.atttypid);
@@ -74,8 +83,10 @@ pub extern "C" fn random_scan_getnextslot(
             }
             // *tts_isnull = true;
         }
-
+        //PgMemoryContexts::set_as_current(&mut oldctx);
+        //(*slot).tts_flags |= TTS_FLAG_SHOULDFREE as u16;
         pg_sys::ExecStoreVirtualTuple(slot);
+        //PgMemoryContexts::set_as_current(&mut oldctx);
 
         true
     }

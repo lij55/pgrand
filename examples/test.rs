@@ -1,15 +1,13 @@
-use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
-
-
-fn my_hash<T>(obj: T) -> u128
-    where
-        T: Hash,
+fn my_hash<T>(obj: T) -> u64
+where
+    T: Hash,
 {
     let mut hasher = DefaultHasher::new();
     obj.hash(&mut hasher);
-    hasher.finish() as u128
+    hasher.finish()
 }
 
 fn main() {

@@ -8,15 +8,19 @@ create foreign data wrapper random handler random_fdw_handler;
 
 create server random_server foreign data wrapper random;
 
+set random.array_length = 10;
+set random.min_text_length = 8;
+set random.max_text_length = 20;
+
 -- create foreign table with options
 create foreign table hello (
        c1 int2,
        c2 int4,
        c3 float,
        c4 decimal(8,2),
-       -- a1 real[] -- deosn't work for real[]
+       a1 real[],
        t1 text,
        t2 char(2)
-) server random_server options (total '20', seed '123456');
+) server random_server options (total '20');
 
-create table t1 (c1 int, c2 int, c3 int) using random;
+ALTER foreign table hello OPTIONS (set total '100');
