@@ -114,6 +114,9 @@ pub fn generate_random_data_for_oid(oid: Oid, rng: &mut ChaCha8Rng) -> Option<Da
         TIMESTAMPOID => {
             Timestamp::from(rng.gen_range(i64::MIN / 128..i64::MAX / 1024)).into_datum()
         }
+        INTERVALOID => {
+        None
+        }
         UUIDOID => {
             let bytes = Faker.fake::<[u8; 16]>();
             Uuid::from_bytes(bytes).into_datum()
@@ -122,6 +125,12 @@ pub fn generate_random_data_for_oid(oid: Oid, rng: &mut ChaCha8Rng) -> Option<Da
         INETOID => {
             let addr = random_ip(rng);
             Inet::from(addr).into_datum()
+        }
+        POINTOID => {
+            random_point(rng, 100).into_datum()
+        }
+        BOXOID =>{
+            None
         }
         _ => None,
     }

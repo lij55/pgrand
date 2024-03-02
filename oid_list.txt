@@ -20,14 +20,15 @@ pub const BPCHAROID: Oid = Oid(1042);
 pub const UUIDOID: Oid = Oid(2950);
 pub const MACADDROID: Oid = Oid(829);
 pub const INETOID: Oid = Oid(869);
-
+pub const POINTOID: Oid = Oid(600);
+pub const BOXOID: Oid = Oid(603);
 
 pub const JSONOID: Oid = Oid(114);
 pub const XMLOID: Oid = Oid(142);
-pub const POINTOID: Oid = Oid(600);
+
 pub const LSEGOID: Oid = Oid(601);
 pub const PATHOID: Oid = Oid(602);
-pub const BOXOID: Oid = Oid(603);
+
 pub const POLYGONOID: Oid = Oid(604);
 pub const LINEOID: Oid = Oid(628);
 
@@ -36,7 +37,7 @@ pub const MONEYOID: Oid = Oid(790);
 
 pub const CIDROID: Oid = Oid(650);
 pub const MACADDR8OID: Oid = Oid(774);
-pub const ACLITEMOID: Oid = Oid(1033);
+
 
 pub const BITOID: Oid = Oid(1560);
 pub const VARBITOID: Oid = Oid(1562);
