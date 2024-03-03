@@ -5,8 +5,9 @@ pub mod guc;
 
 use data::*;
 use pgrx::pg_sys::*;
-use pgrx::{AnyNumeric, Date, Inet, IntoDatum, Time, Uuid};
+use pgrx::{AnyNumeric, Date, Inet, IntoDatum, Json, Time, Uuid};
 use std::str::FromStr;
+use serde_json::json;
 
 use fake::faker;
 use fake::{Fake, Faker};
@@ -15,36 +16,6 @@ use rand::Rng;
 use rand_chacha;
 use rand_chacha::ChaCha8Rng;
 
-pub type DataBuilder = dyn Fn(&mut ChaCha8Rng) -> Option<Datum>;
-
-pub fn create_closure(oid: Oid) -> Box<DataBuilder> {
-    let min = 10;
-    let max = 1000;
-    let _max_len = 29;
-    // Box::new(move |rng: &mut ThreadRng| -> Cell {
-    //     Cell::I64(rng.gen_range(min..max))
-    // })
-    match oid {
-        INT2OID => Box::new(move |rng: &mut ChaCha8Rng| -> Option<Datum> {
-            rng.gen_range(min as i16..max as i16).into_datum()
-        }),
-        FLOAT8ARRAYOID => Box::new(move |rng: &mut ChaCha8Rng| -> Option<Datum> {
-            let mut values = Vec::new();
-            for _i in 0..1024 {
-                values.push(rng.gen_range(-1 as f64..1 as f64))
-            }
-            values.into_datum()
-        }),
-        _ => Box::new(move |_rng: &mut ChaCha8Rng| -> Option<Datum> { None }),
-    }
-}
-
-pub fn apply_builder<F>(f: F, rng: &mut ChaCha8Rng) -> Option<Datum>
-where
-    F: Fn(&mut ChaCha8Rng) -> Option<Datum>,
-{
-    f(rng)
-}
 
 pub fn generate_random_data_for_oid(oid: Oid, rng: &mut ChaCha8Rng) -> Option<Datum> {
     let min_int = PARADE_GUC.min_integer.get() as i16;
@@ -115,7 +86,9 @@ pub fn generate_random_data_for_oid(oid: Oid, rng: &mut ChaCha8Rng) -> Option<Da
             Timestamp::from(rng.gen_range(i64::MIN / 128..i64::MAX / 1024)).into_datum()
         }
         INTERVALOID => {
-        None
+            pgrx::Interval::new(0,
+                                rng.gen_range(0..5),
+                                rng.gen_range(0..24*3600*1000)).into_datum()
         }
         UUIDOID => {
             let bytes = Faker.fake::<[u8; 16]>();
@@ -130,8 +103,26 @@ pub fn generate_random_data_for_oid(oid: Oid, rng: &mut ChaCha8Rng) -> Option<Da
             random_point(rng, 100).into_datum()
         }
         BOXOID =>{
-            None
+            BOX {
+                high: random_point(rng, 100),
+                low: random_point(rng, 100),
+            }.into_datum()
         }
+        CIRCLEOID => {
+            RndCIRCLE::new(rng).into_datum()
+        }
+        JSONOID => {
+            Json(json!(
+                {
+                    "ts": rng.gen_range(0..1893427200),
+                    "text": (10..20).fake_with_rng::<std::string::String, ChaCha8Rng>(rng),
+                    "uuid":  format!("{}", Uuid::from_bytes(Faker.fake::<[u8; 16]>())),
+                    "price": random_numeric(rng, 5, 3),
+                    "count": rng.gen_range(1..10000 as i64 * 2)
+                })).into_datum()
+        }
+        XMLOID => None,
         _ => None,
     }
 }
+
