@@ -11,7 +11,7 @@ curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh
 
 Install pgrx:
 ```bash
-cargo install --locked cargo-pgrx --version 0.11.2
+cargo install --locked cargo-pgrx --version 0.11.3
 ```
 
 Then install your favourate Postgres distribution as usual.
